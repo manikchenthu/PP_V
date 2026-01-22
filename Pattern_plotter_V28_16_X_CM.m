@@ -4426,7 +4426,7 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
     gl.ColumnWidth = {'1x'};
     
     % Scrollable panel - scrollbar on right side of tab
-    sp = uipanel(gl, 'Scrollable', 'on', 'BorderType', 'none');
+    sp = uipanel(gl, 'Scrollable', 'on', 'BorderType', 'none', 'BackgroundColor', 'w');
     
     % Calculate heights
     nv = length(varNames);
@@ -4459,7 +4459,7 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
     cgl = uigridlayout(sp, [nv 1]);
     cgl.RowHeight = num2cell(heights);
     cgl.Padding = [8 8 8 8];
-    cgl.RowSpacing = 10;
+    cgl.RowSpacing = 15;
     
     for i = 1:nv
         vn = varNames{i};
@@ -4551,7 +4551,7 @@ function buildMapTbl(mainFig, interpFig, pnl, vi)
     t = uitable(g, 'Data', tData, 'ColumnName', cNames, 'RowName', 'numbered', ...
         'ColumnEditable', true, 'FontSize', 10);
     
-    cw = max(55, min(85, floor(1200 / size(tData, 2))));
+    cw = max(70, min(100, floor(1200 / size(tData, 2))));
     t.ColumnWidth = repmat({cw}, 1, size(tData, 2));
     
     if ~isempty(yCol)
@@ -4688,16 +4688,38 @@ function vi = extractInterpVariable(T, varName)
 
         if ~isempty(vv)
             vi.value = vv(1);
+            vi.dRowStart = trow;
         else
-            % Handle string values (e.g. boolean flags or text)
-            nonEmpty = rawVals(strlength(strtrim(rawVals)) > 0 & ~ismissing(rawVals));
-            % Filter out variable name itself if it was picked up
-            nonEmpty(strcmpi(nonEmpty, varName)) = [];
-            if ~isempty(nonEmpty)
-                 vi.value = nonEmpty(1); % Store as string
+            % Check next row (trow + 1)
+            nextRowIdx = min(trow+1, height(T));
+            rawValsNext = string(table2cell(T(nextRowIdx, 1:min(10, width(T)))));
+            valsNext = str2double(rawValsNext);
+            vvNext = valsNext(~isnan(valsNext));
+
+            if ~isempty(vvNext)
+                vi.value = vvNext(1);
+                vi.dRowStart = nextRowIdx;
+            else
+                % Handle string values (e.g. boolean flags or text) on trow
+                nonEmpty = rawVals(strlength(strtrim(rawVals)) > 0 & ~ismissing(rawVals));
+                % Filter out variable name itself if it was picked up
+                nonEmpty(strcmpi(nonEmpty, varName)) = [];
+
+                if ~isempty(nonEmpty)
+                     vi.value = nonEmpty(1); % Store as string
+                     vi.dRowStart = trow;
+                else
+                     % Handle string values on trow+1
+                     nonEmptyNext = rawValsNext(strlength(strtrim(rawValsNext)) > 0 & ~ismissing(rawValsNext));
+                     if ~isempty(nonEmptyNext)
+                         vi.value = nonEmptyNext(1);
+                         vi.dRowStart = nextRowIdx;
+                     else
+                         vi.dRowStart = trow; % Default fallback
+                     end
+                end
             end
         end
-        vi.dRowStart = trow;
     else
         % Find data rows
         rs = 0; headerRow = 0;
