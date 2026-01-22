@@ -4499,58 +4499,55 @@ function buildMapTbl(mainFig, interpFig, pnl, vi)
     nr = size(vi.data, 1);
     nc = size(vi.data, 2);
     
-    % INCA format table
-    td = cell(nr + 1, nc + 1);
-    td{1, 1} = vi.name;
+    % Prepare Data: Col 1 = Y-Axis (if exists), Cols 2+ = Data
+    d = num2cell(vi.data);
     
-    % X-axis in first row
-    if ~isempty(vi.xAxis)
-        for c = 1:min(nc, length(vi.xAxis))
-            td{1, c+1} = vi.xAxis(c);
-        end
-    else
-        for c = 1:nc, td{1, c+1} = c; end
-    end
-    
-    % Y-axis in first column
+    % Y-Axis
+    yCol = [];
     if ~isempty(vi.yAxis)
-        for r = 1:min(nr, length(vi.yAxis))
-            td{r+1, 1} = vi.yAxis(r);
+        yVals = vi.yAxis(:);
+        if length(yVals) < nr
+            yVals = [yVals; nan(nr - length(yVals), 1)];
+        elseif length(yVals) > nr
+            yVals = yVals(1:nr);
         end
-    else
-        for r = 1:nr, td{r+1, 1} = r; end
+        yCol = num2cell(yVals);
     end
     
-    % Data
-    for r = 1:nr
-        for c = 1:nc
-            td{r+1, c+1} = vi.data(r, c);
-        end
-    end
-    
-    cn = arrayfun(@(x) num2str(x), 1:(nc+1), 'UniformOutput', false);
+    % X-Axis / Headers
+    cNames = {};
+    if ~isempty(yCol), cNames{1} = 'Y-Axis'; end
 
-    % Use extracted headers for ColumnName if available
+    xHeaders = {};
     if isfield(vi, 'headers') && ~isempty(vi.headers)
-        hLen = length(vi.headers);
-        if hLen == nc
-            cn(2:end) = cellstr(vi.headers);
-        elseif hLen < nc
-            cn(2:1+hLen) = cellstr(vi.headers);
-        elseif hLen > nc
-            cn(2:end) = cellstr(vi.headers(1:nc));
-        end
+        xHeaders = cellstr(vi.headers);
+    elseif ~isempty(vi.xAxis)
+        xHeaders = cellstr(string(vi.xAxis));
+    else
+        xHeaders = arrayfun(@num2str, 1:nc, 'UniformOutput', false);
     end
 
-    t = uitable(g, 'Data', td, 'ColumnName', cn, 'RowName', [], ...
+    if length(xHeaders) > nc, xHeaders = xHeaders(1:nc); end
+    if length(xHeaders) < nc, xHeaders = [xHeaders, repmat({''}, 1, nc-length(xHeaders))]; end
+
+    cNames = [cNames, xHeaders];
+
+    if ~isempty(yCol)
+        tData = [yCol, d];
+    else
+        tData = d;
+    end
+
+    t = uitable(g, 'Data', tData, 'ColumnName', cNames, 'RowName', 'numbered', ...
         'ColumnEditable', true, 'FontSize', 10);
     
-    cw = max(55, min(85, floor(1200 / (nc + 1))));
-    t.ColumnWidth = repmat({cw}, 1, nc + 1);
+    cw = max(55, min(85, floor(1200 / size(tData, 2))));
+    t.ColumnWidth = repmat({cw}, 1, size(tData, 2));
     
-    gs = uistyle('BackgroundColor', [0.85 0.85 0.85], 'FontWeight', 'bold');
-    addStyle(t, gs, 'row', 1);
-    addStyle(t, gs, 'column', 1);
+    if ~isempty(yCol)
+        gs = uistyle('BackgroundColor', [0.9 0.9 0.95], 'FontWeight', 'bold');
+        addStyle(t, gs, 'column', 1);
+    end
     
     t.CellEditCallback = @(s,e) onMapEdit(mainFig, s, e, vi);
     t.CellSelectionCallback = @(s,e) onInterpSel(mainFig, s, e, vi.name);
@@ -4567,7 +4564,7 @@ function buildMapTbl(mainFig, interpFig, pnl, vi)
     uilabel(g, 'Text', sprintf('MAP (%dx%d) | Unit: %s', nr, nc, vi.unit), ...
         'FontSize', 9, 'FontAngle', 'italic', 'FontColor', [0.4 0.4 0.5]);
     
-    vi.isINCA = true;
+    vi.isTCCStyle = true;
     storeTbl(mainFig, t, vi);
 end
 
@@ -4578,38 +4575,36 @@ function buildCurveTbl(mainFig, interpFig, pnl, vi)
     g.RowSpacing = 2;
     
     nc = length(vi.data);
-    td = cell(2, nc);
     
+    % Vertical Layout: Col 1 = X-Axis, Col 2 = Value
+    xCol = [];
     if ~isempty(vi.xAxis)
-        for c = 1:min(nc, length(vi.xAxis))
-            td{1, c} = vi.xAxis(c);
-        end
+        xVals = vi.xAxis(:);
+        if length(xVals) > nc, xVals = xVals(1:nc); end
+        if length(xVals) < nc, xVals = [xVals; nan(nc-length(xVals), 1)]; end
+        xCol = num2cell(xVals);
+    end
+    
+    valCol = num2cell(vi.data(:));
+
+    cNames = {};
+    if ~isempty(xCol)
+        tData = [xCol, valCol];
+        cNames = {'X-Axis', vi.name};
     else
-        for c = 1:nc, td{1, c} = c - 1; end
-    end
-    
-    for c = 1:nc, td{2, c} = vi.data(c); end
-    
-    cn = arrayfun(@(x) num2str(x), 1:nc, 'UniformOutput', false);
-
-    % Use extracted headers for ColumnName if available
-    if isfield(vi, 'headers') && ~isempty(vi.headers)
-        hLen = length(vi.headers);
-        if hLen == nc
-            cn = cellstr(vi.headers);
-        elseif hLen > nc
-            cn = cellstr(vi.headers(1:nc));
-        end
+        tData = valCol;
+        cNames = {vi.name};
     end
 
-    t = uitable(g, 'Data', td, 'ColumnName', cn, 'RowName', {'X-Axis','Value'}, ...
+    t = uitable(g, 'Data', tData, 'ColumnName', cNames, 'RowName', 'numbered', ...
         'ColumnEditable', true, 'FontSize', 10);
     
-    cw = max(50, min(75, floor(1200 / min(nc, 18))));
-    t.ColumnWidth = repmat({cw}, 1, nc);
+    t.ColumnWidth = {80, 100};
     
-    gs = uistyle('BackgroundColor', [0.85 0.85 0.85], 'FontWeight', 'bold');
-    addStyle(t, gs, 'row', 1);
+    if ~isempty(xCol)
+        gs = uistyle('BackgroundColor', [0.9 0.9 0.95], 'FontWeight', 'bold');
+        addStyle(t, gs, 'column', 1);
+    end
     
     t.CellEditCallback = @(s,e) onCurveEdit(mainFig, s, e, vi);
     t.CellSelectionCallback = @(s,e) onInterpSel(mainFig, s, e, vi.name);
@@ -4625,6 +4620,7 @@ function buildCurveTbl(mainFig, interpFig, pnl, vi)
         'FontSize', 9, 'FontAngle', 'italic', 'FontColor', [0.4 0.4 0.5]);
     
     vi.isCurve = true;
+    vi.isTCCStyle = true;
     storeTbl(mainFig, t, vi);
 end
 
@@ -4787,16 +4783,12 @@ end
 
 function onMapEdit(mainFig, t, e, ~)
     pushInterpHist(mainFig);
-    if e.Indices(1) > 1 && e.Indices(2) > 1
-        addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
-    end
+    addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
 end
 
 function onCurveEdit(mainFig, t, e, ~)
     pushInterpHist(mainFig);
-    if e.Indices(1) == 2
-        addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
-    end
+    addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
 end
 
 function onInterpPaste(mainFig, ~, ~)
@@ -4834,12 +4826,16 @@ function undoInterpEdit(mainFig)
 end
 
 function applyGrayHdr(t, vi)
-    gs = uistyle('BackgroundColor', [0.85 0.85 0.85], 'FontWeight', 'bold');
-    if isfield(vi, 'isINCA') && vi.isINCA
-        addStyle(t, gs, 'row', 1);
-        addStyle(t, gs, 'column', 1);
-    elseif isfield(vi, 'isCurve') && vi.isCurve
-        addStyle(t, gs, 'row', 1);
+    gs = uistyle('BackgroundColor', [0.9 0.9 0.95], 'FontWeight', 'bold');
+
+    if strcmp(vi.type, 'MAP') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+        if ~isempty(vi.yAxis)
+            addStyle(t, gs, 'column', 1);
+        end
+    elseif strcmp(vi.type, 'CURVE') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+        if ~isempty(vi.xAxis)
+            addStyle(t, gs, 'column', 1);
+        end
     end
 end
 
@@ -4910,22 +4906,35 @@ function saveInterpData(mainFig, interpFig)
                     end
                 end
             end
-        elseif strcmp(vi.type, 'MAP') && vi.isINCA
-            nr = size(d, 1) - 1;
-            nc = size(d, 2) - 1;
+        elseif strcmp(vi.type, 'MAP') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+            % Map in TCC style:
+            % If vi.yAxis exists, data starts at Col 2. Else Col 1.
+            dataColStart = 1;
+            if ~isempty(vi.yAxis), dataColStart = 2; end
+
+            nr = size(d, 1);
+            nc = size(d, 2) - dataColStart + 1;
+
             for dr = 1:nr
                 tr = vi.dRowStart + dr - 1;
                 if tr <= height(T)
                     for dc = 1:nc
-                        val = d{dr + 1, dc + 1};
+                        val = d{dr, dc + dataColStart - 1};
                         if isnumeric(val), T{tr, 2 + dc} = {val}; end
                     end
                 end
             end
-        elseif strcmp(vi.type, 'CURVE') && vi.isCurve
+        elseif strcmp(vi.type, 'CURVE') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+            % Curve in Vertical style:
+            % If vi.xAxis exists, data is in Col 2. Else Col 1.
+            dataCol = 1;
+            if ~isempty(vi.xAxis), dataCol = 2; end
+
+            % Save to CSV (Horizontal)
+            nc = size(d, 1);
             if vi.dRowStart > 0 && vi.dRowStart <= height(T)
-                for dc = 1:size(d, 2)
-                    val = d{2, dc};
+                for dc = 1:nc
+                    val = d{dc, dataCol};
                     if isnumeric(val), T{vi.dRowStart, 2 + dc} = {val}; end
                 end
             end
