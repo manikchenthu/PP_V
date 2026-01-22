@@ -628,7 +628,7 @@ function Pattern_plotter_V28_16_X_CM
     uibutton(btnGrid, 'Text', 'Edit Multi Maps', buttonStyle{:}, 'ButtonPushedFcn', @(~,~) openMultiMapEditor(fig));
     uibutton(btnGrid, 'Text', 'STAT & UK Table', buttonStyle{:}, 'ButtonPushedFcn', @(~,~) openUKTable(fig));
     uibutton(btnGrid, 'Text', 'TCC Editor', buttonStyle{:},'ButtonPushedFcn', @(~,~) openTCCEditor(fig));
-    uibutton(btnGrid, 'Text', 'Interplotaion', buttonStyle{:},'ButtonPushedFcn', @(~,~) Intermaps(fig));    
+    uibutton(btnGrid, 'Text', 'Interpolation', buttonStyle{:},'ButtonPushedFcn', @(~,~) Intermaps(fig));
     uibutton(btnGrid, 'Text', '2D & 3D Plots', buttonStyle{:},'ButtonPushedFcn', @(~,~) Genplots(fig));
 
     % === HANDLES & CALLBACKS ===
