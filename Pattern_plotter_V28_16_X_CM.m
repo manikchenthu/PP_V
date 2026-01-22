@@ -4439,14 +4439,14 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
                 heights(i) = 55;
             elseif strcmp(vi.type, 'MAP')
                 nr = size(vi.data, 1);
-            % Show min(nr, 20) rows + header
-                % Row height ~25px (increased for safety), Header ~25px, Title/Padding ~45px
-            displayRows = min(nr, 20);
+                % Show ALL rows to force scrollbar (min 3 rows for empty tables)
+                % Row height ~25px, Header ~25px, Title/Padding ~45px
+                displayRows = max(3, nr);
                 heights(i) = 45 + 25 + (displayRows * 25);
             elseif strcmp(vi.type, 'CURVE')
-            nr = length(vi.data);
-            % Vertical layout: Show min(nr, 20) rows
-            displayRows = min(nr, 20);
+                nr = length(vi.data);
+                % Vertical layout: Show ALL rows to force scrollbar
+                displayRows = max(3, nr);
                 heights(i) = 45 + 25 + (displayRows * 25);
             else
                 heights(i) = 60;
@@ -4645,16 +4645,22 @@ end
 function vi = extractInterpVariable(T, varName)
     vi = [];
     
-    % Find variable name in Var2
+    % Find variable name in Var2, fallback to Var1
     idx = find(contains(T.Var2, varName, 'IgnoreCase', true), 1);
+    if isempty(idx) && width(T) >= 1
+        idx = find(contains(T.Var1, varName, 'IgnoreCase', true), 1);
+    end
     if isempty(idx), return; end
     
-    % Find type marker
+    % Find type marker (Scan backwards and forwards)
     dtype = ''; trow = 0; unit = '-';
-    for r = idx : min(idx + 8, height(T))
+    scanStart = max(1, idx - 5);
+    scanEnd = min(idx + 8, height(T));
+
+    for r = scanStart : scanEnd
         c1str = strtrim(string(T{r, 1}));
         
-        % Extract unit
+        % Extract unit if present
         rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
         um = regexp(rtxt, ':"([^"]+)":', 'tokens');
         if ~isempty(um), unit = um{1}{1}; end
@@ -4675,9 +4681,22 @@ function vi = extractInterpVariable(T, varName)
         'dRowStart', 0, 'dRowEnd', 0, 'dColEnd', 0, 'isINCA', false, 'isCurve', false);
     
     if strcmp(dtype, 'VALUE')
-        vals = str2double(string(table2cell(T(trow, 3:end))));
+        % Try extracting numeric value from columns 2-10
+        rawVals = string(table2cell(T(trow, 2:min(10, width(T)))));
+        vals = str2double(rawVals);
         vv = vals(~isnan(vals));
-        if ~isempty(vv), vi.value = vv(1); end
+
+        if ~isempty(vv)
+            vi.value = vv(1);
+        else
+            % Handle string values (e.g. boolean flags or text)
+            nonEmpty = rawVals(strlength(strtrim(rawVals)) > 0 & ~ismissing(rawVals));
+            % Filter out variable name itself if it was picked up
+            nonEmpty(strcmpi(nonEmpty, varName)) = [];
+            if ~isempty(nonEmpty)
+                 vi.value = nonEmpty(1); % Store as string
+            end
+        end
         vi.dRowStart = trow;
     else
         % Find data rows
