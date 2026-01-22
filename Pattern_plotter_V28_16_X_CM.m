@@ -4427,6 +4427,7 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
     
     % Scrollable panel - scrollbar on right side of tab
     sp = uipanel(gl, 'Scrollable', 'on', 'BorderType', 'none', 'BackgroundColor', 'w');
+    sp.Layout.Row = 1; sp.Layout.Column = 1;
     
     % Calculate heights
     nv = length(varNames);
@@ -4652,26 +4653,33 @@ function vi = extractInterpVariable(T, varName)
     end
     if isempty(idx), return; end
     
-    % Find type marker (Scan backwards and forwards)
+    % Find type marker
+    % Prioritize Forward Scan (Current row to +8)
     dtype = ''; trow = 0; unit = '-';
-    scanStart = max(1, idx - 5);
-    scanEnd = min(idx + 8, height(T));
 
-    for r = scanStart : scanEnd
-        c1str = strtrim(string(T{r, 1}));
-        
-        % Extract unit if present
-        rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
-        um = regexp(rtxt, ':"([^"]+)":', 'tokens');
-        if ~isempty(um), unit = um{1}{1}; end
-        
-        if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
-            dtype = 'VALUE'; trow = r; break;
-        elseif strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,')
-            dtype = 'MAP'; trow = r; break;
-        elseif strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
-            dtype = 'CURVE'; trow = r; break;
+    scanRanges = {idx : min(idx + 8, height(T)), (idx - 1) : -1 : max(1, idx - 5)};
+
+    for k = 1:2
+        range = scanRanges{k};
+        for r = range
+            c1str = strtrim(string(T{r, 1}));
+
+            % Extract unit if present (and not already found)
+            if strcmp(unit, '-')
+                rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+                um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+                if ~isempty(um), unit = um{1}{1}; end
+            end
+
+            if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
+                dtype = 'VALUE'; trow = r; break;
+            elseif strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,')
+                dtype = 'MAP'; trow = r; break;
+            elseif strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
+                dtype = 'CURVE'; trow = r; break;
+            end
         end
+        if ~isempty(dtype), break; end
     end
     
     if isempty(dtype), return; end
