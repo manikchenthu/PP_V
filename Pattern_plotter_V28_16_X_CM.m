@@ -4529,6 +4529,19 @@ function buildMapTbl(mainFig, interpFig, pnl, vi)
     end
     
     cn = arrayfun(@(x) num2str(x), 1:(nc+1), 'UniformOutput', false);
+
+    % Use extracted headers for ColumnName if available
+    if isfield(vi, 'headers') && ~isempty(vi.headers)
+        hLen = length(vi.headers);
+        if hLen == nc
+            cn(2:end) = cellstr(vi.headers);
+        elseif hLen < nc
+            cn(2:1+hLen) = cellstr(vi.headers);
+        elseif hLen > nc
+            cn(2:end) = cellstr(vi.headers(1:nc));
+        end
+    end
+
     t = uitable(g, 'Data', td, 'ColumnName', cn, 'RowName', [], ...
         'ColumnEditable', true, 'FontSize', 10);
     
@@ -4578,6 +4591,17 @@ function buildCurveTbl(mainFig, interpFig, pnl, vi)
     for c = 1:nc, td{2, c} = vi.data(c); end
     
     cn = arrayfun(@(x) num2str(x), 1:nc, 'UniformOutput', false);
+
+    % Use extracted headers for ColumnName if available
+    if isfield(vi, 'headers') && ~isempty(vi.headers)
+        hLen = length(vi.headers);
+        if hLen == nc
+            cn = cellstr(vi.headers);
+        elseif hLen > nc
+            cn = cellstr(vi.headers(1:nc));
+        end
+    end
+
     t = uitable(g, 'Data', td, 'ColumnName', cn, 'RowName', {'X-Axis','Value'}, ...
         'ColumnEditable', true, 'FontSize', 10);
     
@@ -4641,7 +4665,7 @@ function vi = extractInterpVariable(T, varName)
     if isempty(dtype), return; end
     
     vi = struct('name', varName, 'type', dtype, 'row', idx, 'trow', trow, 'unit', unit, ...
-        'xAxis', [], 'yAxis', [], 'data', [], 'value', NaN, ...
+        'xAxis', [], 'yAxis', [], 'data', [], 'value', NaN, 'headers', [], ...
         'dRowStart', 0, 'dRowEnd', 0, 'dColEnd', 0, 'isINCA', false, 'isCurve', false);
     
     if strcmp(dtype, 'VALUE')
@@ -4651,10 +4675,21 @@ function vi = extractInterpVariable(T, varName)
         vi.dRowStart = trow;
     else
         % Find data rows
-        rs = 0;
+        rs = 0; headerRow = 0;
         for r = trow + 1 : min(trow + 8, height(T))
+            % Check for data row (mostly numeric)
             vals = str2double(string(table2cell(T(r, 3:end))));
             if sum(~isnan(vals)) > 2, rs = r; break; end
+
+            % Check for header row (contains text in data columns, not system row)
+            % Heuristic: First column is empty or not system keyword, and cols 3+ have content
+            rowTxt = strjoin(string(table2cell(T(r, 1:min(3, width(T))))), " ");
+            if ~contains(rowTxt, ["X_AXIS","Y_AXIS","MAP","CURVE","VALUE"], 'IgnoreCase', true)
+                 rowC = string(table2cell(T(r, 3:end)));
+                 if any(strlength(rowC) > 0 & ~ismissing(rowC))
+                     headerRow = r;
+                 end
+            end
         end
         if rs == 0, return; end
         
@@ -4669,6 +4704,12 @@ function vi = extractInterpVariable(T, varName)
         lv = find(~isnan(fr), 1, 'last');
         mc = max(3, lv);
         
+        if headerRow > 0
+             % Extract headers up to mc
+             rawHeaders = string(table2cell(T(headerRow, 3:mc)));
+             vi.headers = rawHeaders;
+        end
+
         data = str2double(string(table2cell(T(rs:re, 3:mc))));
         vi.dRowStart = rs;
         vi.dRowEnd = re;
