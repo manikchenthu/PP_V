@@ -4435,9 +4435,15 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
                 heights(i) = 55;
             elseif strcmp(vi.type, 'MAP')
                 nr = size(vi.data, 1);
-                heights(i) = 60 + (nr + 1) * 24;
+            % Show min(nr, 20) rows + header
+            % Row height ~22px, Header ~25px, Title/Padding ~40px
+            displayRows = min(nr, 20);
+            heights(i) = 40 + 25 + (displayRows * 22);
             elseif strcmp(vi.type, 'CURVE')
-                heights(i) = 60 + 2 * 24;
+            nr = length(vi.data);
+            % Vertical layout: Show min(nr, 20) rows
+            displayRows = min(nr, 20);
+            heights(i) = 40 + 25 + (displayRows * 22);
             else
                 heights(i) = 60;
             end
