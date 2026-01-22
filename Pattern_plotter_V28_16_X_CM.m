@@ -4696,7 +4696,7 @@ end
 function axisPts = findAxisValuesCorrect(T, varName, axisType, startRow)
 % CORRECTED axis extraction:
 % Look for row where Var1 starts with axisType (X_AXIS_PTS or Y_AXIS_PTS)
-% AND the previous row has varName in Var2
+% AND the previous row (or r-2) has varName in Var2
 % Values are in columns 3+ of the axisType row
     axisPts = [];
     
@@ -4704,15 +4704,22 @@ function axisPts = findAxisValuesCorrect(T, varName, axisType, startRow)
         % Check if current row's Var1 starts with axisType
         v1 = strtrim(string(T{r, 1}));
         if startsWith(v1, axisType, 'IgnoreCase', true)
-            % Check if previous row has our variable name in Var2
+            % Check if previous row (r-1) OR row before that (r-2) has our variable name in Var2
+            match = false;
             if r > 1
                 v2prev = strtrim(string(T.Var2(r-1)));
-                if contains(v2prev, varName, 'IgnoreCase', true)
-                    % Extract values from columns 3 onwards of THIS row
-                    vals = str2double(string(table2cell(T(r, 3:end))));
-                    axisPts = vals(~isnan(vals));
-                    return;
-                end
+                if contains(v2prev, varName, 'IgnoreCase', true), match = true; end
+            end
+            if ~match && r > 2
+                v2prev2 = strtrim(string(T.Var2(r-2)));
+                if contains(v2prev2, varName, 'IgnoreCase', true), match = true; end
+            end
+
+            if match
+                % Extract values from columns 3 onwards of THIS row
+                vals = str2double(string(table2cell(T(r, 3:end))));
+                axisPts = vals(~isnan(vals));
+                return;
             end
         end
     end
