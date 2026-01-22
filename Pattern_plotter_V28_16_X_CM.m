@@ -4727,9 +4727,9 @@ function vi = extractInterpVariable(T, varName)
         % Pattern in CSV:
         %   Row N:   ,SIBE_AdiffMidForUKTOW    (varName in Var2)
         %   Row N+1: X_AXIS_PTS,:"-":,-120,-24,0,14,...  (axisType in Var1, values in col 3+)
-        vi.xAxis = findAxisValuesCorrect(T, varName, 'X_AXIS_PTS', re);
+        vi.xAxis = findAxisValuesCorrect(T, varName, 'X_AXIS_PTS', idx);
         if strcmp(dtype, 'MAP')
-            vi.yAxis = findAxisValuesCorrect(T, varName, 'Y_AXIS_PTS', re);
+            vi.yAxis = findAxisValuesCorrect(T, varName, 'Y_AXIS_PTS', idx);
         end
     end
 end
@@ -4745,9 +4745,13 @@ function axisPts = findAxisValuesCorrect(T, varName, axisType, startRow)
         % Check if current row's Var1 starts with axisType
         v1 = strtrim(string(T{r, 1}));
         if startsWith(v1, axisType, 'IgnoreCase', true)
-            % Check if previous row (r-1) OR row before that (r-2) has our variable name in Var2
+            % Check if current row (r), previous row (r-1) OR row before that (r-2) has our variable name in Var2
             match = false;
-            if r > 1
+            % Check current row
+            v2curr = strtrim(string(T.Var2(r)));
+            if contains(v2curr, varName, 'IgnoreCase', true), match = true; end
+
+            if ~match && r > 1
                 v2prev = strtrim(string(T.Var2(r-1)));
                 if contains(v2prev, varName, 'IgnoreCase', true), match = true; end
             end
