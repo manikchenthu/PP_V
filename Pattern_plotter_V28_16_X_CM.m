@@ -4657,29 +4657,64 @@ function vi = extractInterpVariable(T, varName)
     % Prioritize Forward Scan (Current row to +8)
     dtype = ''; trow = 0; unit = '-';
 
-    scanRanges = {idx : min(idx + 8, height(T)), (idx - 1) : -1 : max(1, idx - 5)};
+    % Priority 1: Forward Scan for MAP or CURVE (Strong Types)
+    scanForward = idx : min(idx + 8, height(T));
+    for r = scanForward
+        c1str = strtrim(string(T{r, 1}));
+        if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,') || strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
+            if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,'), dtype = 'MAP'; else, dtype = 'CURVE'; end
+            trow = r;
+            % Extract unit
+            rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+            um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+            if ~isempty(um), unit = um{1}{1}; end
+            break;
+        end
+    end
 
-    for k = 1:2
-        range = scanRanges{k};
-        for r = range
+    % Priority 2: Forward Scan for VALUE (Weak Type), only if no strong type found
+    if isempty(dtype)
+        for r = scanForward
             c1str = strtrim(string(T{r, 1}));
-
-            % Extract unit if present (and not already found)
-            if strcmp(unit, '-')
+            if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
+                dtype = 'VALUE'; trow = r;
                 rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
                 um = regexp(rtxt, ':"([^"]+)":', 'tokens');
                 if ~isempty(um), unit = um{1}{1}; end
-            end
-
-            if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
-                dtype = 'VALUE'; trow = r; break;
-            elseif strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,')
-                dtype = 'MAP'; trow = r; break;
-            elseif strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
-                dtype = 'CURVE'; trow = r; break;
+                break;
             end
         end
-        if ~isempty(dtype), break; end
+    end
+
+    % Priority 3: Backward Scan for MAP/CURVE
+    if isempty(dtype)
+        scanBackward = (idx - 1) : -1 : max(1, idx - 5);
+        for r = scanBackward
+            c1str = strtrim(string(T{r, 1}));
+            if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,') || strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
+                if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,'), dtype = 'MAP'; else, dtype = 'CURVE'; end
+                trow = r;
+                rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+                um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+                if ~isempty(um), unit = um{1}{1}; end
+                break;
+            end
+        end
+    end
+
+    % Priority 4: Backward Scan for VALUE
+    if isempty(dtype)
+        scanBackward = (idx - 1) : -1 : max(1, idx - 5);
+        for r = scanBackward
+            c1str = strtrim(string(T{r, 1}));
+            if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
+                dtype = 'VALUE'; trow = r;
+                rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+                um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+                if ~isempty(um), unit = um{1}{1}; end
+                break;
+            end
+        end
     end
     
     if isempty(dtype), return; end
