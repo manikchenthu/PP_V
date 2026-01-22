@@ -4400,7 +4400,8 @@ function buildInterpTabs(mainFig, interpFig, tg, interpData)
     buildScrollTab(mainFig, interpFig, uitab(tg,'Title','SiOD'), interpData, {'FSIT_SWIOD','SIOD_RGA_EXIT','SIOD_VEntr1G','SIOD_VEntr2G','SIOD_VEntr3G','SIOD_VEntr4G','SIOD_NabEntr5G','SIOD_NabEntr6G','SIOD_NabEntr7G','SIOD_Voffs'});
     
     gradeTab = uitab(tg,'Title','Grade');
-    gTg = uitabgroup(gradeTab);
+    glG = uigridlayout(gradeTab, [1 1]); glG.Padding = [0 0 0 0];
+    gTg = uitabgroup(glG);
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','Grade Tables'), interpData, {'SIBE_AdiffMidPar1','SIBE_AdiffMidPar2','SIBE_AdiffMidPar3','SIBE_AdiffMidPar4','SIBE_AdiffMidPar5'});
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','Shifting Situation'), interpData, {'SIBE_AdiffMidParForUKTYP','SIBE_AdiffMidParForUKFGR','SIBE_AdiffMidParForUKBSG'});
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','ECO Grade'), interpData, {'SIBE_AdiffMidForUKECO'});
@@ -4411,7 +4412,8 @@ function buildInterpTabs(mainFig, interpFig, tg, interpData)
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','Mud Grade'), interpData, {'SIBE_AdiffMidForUKXC','SIBE_AdiffMidForUKXC_LOW'});
     
     brakeTab = uitab(tg,'Title','Brake');
-    bTg = uitabgroup(brakeTab);
+    glB = uigridlayout(brakeTab, [1 1]); glB.Padding = [0 0 0 0];
+    bTg = uitabgroup(glB);
     buildScrollTab(mainFig, interpFig, uitab(bTg,'Title','NAB ADIFF (Grade)'), interpData, {'UKSVF_NABADIFF_21RS','UKSVF_NABADIFF_32RS','UKSVF_NABADIFF_43RS','UKSVF_NABADIFF_54RS','UKSVF_NABADIFF_65RS','UKSVF_NABADIFF_76RS','UKSVF_NABADIFF_87RS'});
     buildScrollTab(mainFig, interpFig, uitab(bTg,'Title','NAB KF (Driver)'), interpData, {'UKSVF_NABKF_21RS','UKSVF_NABKF_32RS','UKSVF_NABKF_43RS','UKSVF_NABKF_54RS','UKSVF_NABKF_65RS','UKSVF_NABKF_76RS','UKSVF_NABKF_87RS'});
 end
@@ -4420,6 +4422,8 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
     % Single scrollable panel for entire tab content
     gl = uigridlayout(tab, [1 1]);
     gl.Padding = [0 0 0 0];
+    gl.RowHeight = {'1x'};
+    gl.ColumnWidth = {'1x'};
     
     % Scrollable panel - scrollbar on right side of tab
     sp = uipanel(gl, 'Scrollable', 'on', 'BorderType', 'none');
@@ -4436,14 +4440,14 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
             elseif strcmp(vi.type, 'MAP')
                 nr = size(vi.data, 1);
             % Show min(nr, 20) rows + header
-            % Row height ~22px, Header ~25px, Title/Padding ~40px
+                % Row height ~25px (increased for safety), Header ~25px, Title/Padding ~45px
             displayRows = min(nr, 20);
-            heights(i) = 40 + 25 + (displayRows * 22);
+                heights(i) = 45 + 25 + (displayRows * 25);
             elseif strcmp(vi.type, 'CURVE')
             nr = length(vi.data);
             % Vertical layout: Show min(nr, 20) rows
             displayRows = min(nr, 20);
-            heights(i) = 40 + 25 + (displayRows * 22);
+                heights(i) = 45 + 25 + (displayRows * 25);
             else
                 heights(i) = 60;
             end
