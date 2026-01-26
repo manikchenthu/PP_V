@@ -628,7 +628,7 @@ function Pattern_plotter_V28_16_X_CM
     uibutton(btnGrid, 'Text', 'Edit Multi Maps', buttonStyle{:}, 'ButtonPushedFcn', @(~,~) openMultiMapEditor(fig));
     uibutton(btnGrid, 'Text', 'STAT & UK Table', buttonStyle{:}, 'ButtonPushedFcn', @(~,~) openUKTable(fig));
     uibutton(btnGrid, 'Text', 'TCC Editor', buttonStyle{:},'ButtonPushedFcn', @(~,~) openTCCEditor(fig));
-    uibutton(btnGrid, 'Text', 'Interplotaion', buttonStyle{:},'ButtonPushedFcn', @(~,~) Intermaps(fig));    
+    uibutton(btnGrid, 'Text', 'Interpolation', buttonStyle{:},'ButtonPushedFcn', @(~,~) Intermaps(fig));
     uibutton(btnGrid, 'Text', '2D & 3D Plots', buttonStyle{:},'ButtonPushedFcn', @(~,~) Genplots(fig));
 
     % === HANDLES & CALLBACKS ===
@@ -4400,7 +4400,8 @@ function buildInterpTabs(mainFig, interpFig, tg, interpData)
     buildScrollTab(mainFig, interpFig, uitab(tg,'Title','SiOD'), interpData, {'FSIT_SWIOD','SIOD_RGA_EXIT','SIOD_VEntr1G','SIOD_VEntr2G','SIOD_VEntr3G','SIOD_VEntr4G','SIOD_NabEntr5G','SIOD_NabEntr6G','SIOD_NabEntr7G','SIOD_Voffs'});
     
     gradeTab = uitab(tg,'Title','Grade');
-    gTg = uitabgroup(gradeTab);
+    glG = uigridlayout(gradeTab, [1 1]); glG.Padding = [0 0 0 0];
+    gTg = uitabgroup(glG);
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','Grade Tables'), interpData, {'SIBE_AdiffMidPar1','SIBE_AdiffMidPar2','SIBE_AdiffMidPar3','SIBE_AdiffMidPar4','SIBE_AdiffMidPar5'});
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','Shifting Situation'), interpData, {'SIBE_AdiffMidParForUKTYP','SIBE_AdiffMidParForUKFGR','SIBE_AdiffMidParForUKBSG'});
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','ECO Grade'), interpData, {'SIBE_AdiffMidForUKECO'});
@@ -4411,7 +4412,8 @@ function buildInterpTabs(mainFig, interpFig, tg, interpData)
     buildScrollTab(mainFig, interpFig, uitab(gTg,'Title','Mud Grade'), interpData, {'SIBE_AdiffMidForUKXC','SIBE_AdiffMidForUKXC_LOW'});
     
     brakeTab = uitab(tg,'Title','Brake');
-    bTg = uitabgroup(brakeTab);
+    glB = uigridlayout(brakeTab, [1 1]); glB.Padding = [0 0 0 0];
+    bTg = uitabgroup(glB);
     buildScrollTab(mainFig, interpFig, uitab(bTg,'Title','NAB ADIFF (Grade)'), interpData, {'UKSVF_NABADIFF_21RS','UKSVF_NABADIFF_32RS','UKSVF_NABADIFF_43RS','UKSVF_NABADIFF_54RS','UKSVF_NABADIFF_65RS','UKSVF_NABADIFF_76RS','UKSVF_NABADIFF_87RS'});
     buildScrollTab(mainFig, interpFig, uitab(bTg,'Title','NAB KF (Driver)'), interpData, {'UKSVF_NABKF_21RS','UKSVF_NABKF_32RS','UKSVF_NABKF_43RS','UKSVF_NABKF_54RS','UKSVF_NABKF_65RS','UKSVF_NABKF_76RS','UKSVF_NABKF_87RS'});
 end
@@ -4420,9 +4422,12 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
     % Single scrollable panel for entire tab content
     gl = uigridlayout(tab, [1 1]);
     gl.Padding = [0 0 0 0];
+    gl.RowHeight = {'1x'};
+    gl.ColumnWidth = {'1x'};
     
     % Scrollable panel - scrollbar on right side of tab
-    sp = uipanel(gl, 'Scrollable', 'on', 'BorderType', 'none');
+    sp = uipanel(gl, 'Scrollable', 'on', 'BorderType', 'none', 'BackgroundColor', 'w');
+    sp.Layout.Row = 1; sp.Layout.Column = 1;
     
     % Calculate heights
     nv = length(varNames);
@@ -4435,9 +4440,15 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
                 heights(i) = 55;
             elseif strcmp(vi.type, 'MAP')
                 nr = size(vi.data, 1);
-                heights(i) = 60 + (nr + 1) * 24;
+                % Show ALL rows to force scrollbar (min 3 rows for empty tables)
+                % Row height ~25px, Header ~25px, Title/Padding ~45px
+                displayRows = max(3, nr);
+                heights(i) = 45 + 25 + (displayRows * 25);
             elseif strcmp(vi.type, 'CURVE')
-                heights(i) = 60 + 2 * 24;
+                nr = length(vi.data);
+                % Vertical layout: Show ALL rows to force scrollbar
+                displayRows = max(3, nr);
+                heights(i) = 45 + 25 + (displayRows * 25);
             else
                 heights(i) = 60;
             end
@@ -4449,7 +4460,7 @@ function buildScrollTab(mainFig, interpFig, tab, interpData, varNames)
     cgl = uigridlayout(sp, [nv 1]);
     cgl.RowHeight = num2cell(heights);
     cgl.Padding = [8 8 8 8];
-    cgl.RowSpacing = 10;
+    cgl.RowSpacing = 15;
     
     for i = 1:nv
         vn = varNames{i};
@@ -4499,45 +4510,55 @@ function buildMapTbl(mainFig, interpFig, pnl, vi)
     nr = size(vi.data, 1);
     nc = size(vi.data, 2);
     
-    % INCA format table
-    td = cell(nr + 1, nc + 1);
-    td{1, 1} = vi.name;
+    % Prepare Data: Col 1 = Y-Axis (if exists), Cols 2+ = Data
+    d = num2cell(vi.data);
     
-    % X-axis in first row
-    if ~isempty(vi.xAxis)
-        for c = 1:min(nc, length(vi.xAxis))
-            td{1, c+1} = vi.xAxis(c);
-        end
-    else
-        for c = 1:nc, td{1, c+1} = c; end
-    end
-    
-    % Y-axis in first column
+    % Y-Axis
+    yCol = [];
     if ~isempty(vi.yAxis)
-        for r = 1:min(nr, length(vi.yAxis))
-            td{r+1, 1} = vi.yAxis(r);
+        yVals = vi.yAxis(:);
+        if length(yVals) < nr
+            yVals = [yVals; nan(nr - length(yVals), 1)];
+        elseif length(yVals) > nr
+            yVals = yVals(1:nr);
         end
+        yCol = num2cell(yVals);
+    end
+    
+    % X-Axis / Headers
+    cNames = {};
+    if ~isempty(yCol), cNames{1} = 'Y-Axis'; end
+
+    xHeaders = {};
+    if isfield(vi, 'headers') && ~isempty(vi.headers)
+        xHeaders = cellstr(vi.headers);
+    elseif ~isempty(vi.xAxis)
+        xHeaders = cellstr(string(vi.xAxis));
     else
-        for r = 1:nr, td{r+1, 1} = r; end
+        xHeaders = arrayfun(@num2str, 1:nc, 'UniformOutput', false);
     end
-    
-    % Data
-    for r = 1:nr
-        for c = 1:nc
-            td{r+1, c+1} = vi.data(r, c);
-        end
+
+    if length(xHeaders) > nc, xHeaders = xHeaders(1:nc); end
+    if length(xHeaders) < nc, xHeaders = [xHeaders, repmat({''}, 1, nc-length(xHeaders))]; end
+
+    cNames = [cNames, xHeaders];
+
+    if ~isempty(yCol)
+        tData = [yCol, d];
+    else
+        tData = d;
     end
-    
-    cn = arrayfun(@(x) num2str(x), 1:(nc+1), 'UniformOutput', false);
-    t = uitable(g, 'Data', td, 'ColumnName', cn, 'RowName', [], ...
+
+    t = uitable(g, 'Data', tData, 'ColumnName', cNames, 'RowName', 'numbered', ...
         'ColumnEditable', true, 'FontSize', 10);
     
-    cw = max(55, min(85, floor(1200 / (nc + 1))));
-    t.ColumnWidth = repmat({cw}, 1, nc + 1);
+    cw = max(70, min(100, floor(1200 / size(tData, 2))));
+    t.ColumnWidth = repmat({cw}, 1, size(tData, 2));
     
-    gs = uistyle('BackgroundColor', [0.85 0.85 0.85], 'FontWeight', 'bold');
-    addStyle(t, gs, 'row', 1);
-    addStyle(t, gs, 'column', 1);
+    if ~isempty(yCol)
+        gs = uistyle('BackgroundColor', [0.9 0.9 0.95], 'FontWeight', 'bold');
+        addStyle(t, gs, 'column', 1);
+    end
     
     t.CellEditCallback = @(s,e) onMapEdit(mainFig, s, e, vi);
     t.CellSelectionCallback = @(s,e) onInterpSel(mainFig, s, e, vi.name);
@@ -4554,7 +4575,7 @@ function buildMapTbl(mainFig, interpFig, pnl, vi)
     uilabel(g, 'Text', sprintf('MAP (%dx%d) | Unit: %s', nr, nc, vi.unit), ...
         'FontSize', 9, 'FontAngle', 'italic', 'FontColor', [0.4 0.4 0.5]);
     
-    vi.isINCA = true;
+    vi.isTCCStyle = true;
     storeTbl(mainFig, t, vi);
 end
 
@@ -4565,27 +4586,36 @@ function buildCurveTbl(mainFig, interpFig, pnl, vi)
     g.RowSpacing = 2;
     
     nc = length(vi.data);
-    td = cell(2, nc);
     
+    % Vertical Layout: Col 1 = X-Axis, Col 2 = Value
+    xCol = [];
     if ~isempty(vi.xAxis)
-        for c = 1:min(nc, length(vi.xAxis))
-            td{1, c} = vi.xAxis(c);
-        end
-    else
-        for c = 1:nc, td{1, c} = c - 1; end
+        xVals = vi.xAxis(:);
+        if length(xVals) > nc, xVals = xVals(1:nc); end
+        if length(xVals) < nc, xVals = [xVals; nan(nc-length(xVals), 1)]; end
+        xCol = num2cell(xVals);
     end
     
-    for c = 1:nc, td{2, c} = vi.data(c); end
-    
-    cn = arrayfun(@(x) num2str(x), 1:nc, 'UniformOutput', false);
-    t = uitable(g, 'Data', td, 'ColumnName', cn, 'RowName', {'X-Axis','Value'}, ...
+    valCol = num2cell(vi.data(:));
+
+    cNames = {};
+    if ~isempty(xCol)
+        tData = [xCol, valCol];
+        cNames = {'X-Axis', vi.name};
+    else
+        tData = valCol;
+        cNames = {vi.name};
+    end
+
+    t = uitable(g, 'Data', tData, 'ColumnName', cNames, 'RowName', 'numbered', ...
         'ColumnEditable', true, 'FontSize', 10);
     
-    cw = max(50, min(75, floor(1200 / min(nc, 18))));
-    t.ColumnWidth = repmat({cw}, 1, nc);
+    t.ColumnWidth = {80, 100};
     
-    gs = uistyle('BackgroundColor', [0.85 0.85 0.85], 'FontWeight', 'bold');
-    addStyle(t, gs, 'row', 1);
+    if ~isempty(xCol)
+        gs = uistyle('BackgroundColor', [0.9 0.9 0.95], 'FontWeight', 'bold');
+        addStyle(t, gs, 'column', 1);
+    end
     
     t.CellEditCallback = @(s,e) onCurveEdit(mainFig, s, e, vi);
     t.CellSelectionCallback = @(s,e) onInterpSel(mainFig, s, e, vi.name);
@@ -4601,6 +4631,7 @@ function buildCurveTbl(mainFig, interpFig, pnl, vi)
         'FontSize', 9, 'FontAngle', 'italic', 'FontColor', [0.4 0.4 0.5]);
     
     vi.isCurve = true;
+    vi.isTCCStyle = true;
     storeTbl(mainFig, t, vi);
 end
 
@@ -4615,46 +4646,140 @@ end
 function vi = extractInterpVariable(T, varName)
     vi = [];
     
-    % Find variable name in Var2
+    % Find variable name in Var2, fallback to Var1
     idx = find(contains(T.Var2, varName, 'IgnoreCase', true), 1);
+    if isempty(idx) && width(T) >= 1
+        idx = find(contains(T.Var1, varName, 'IgnoreCase', true), 1);
+    end
     if isempty(idx), return; end
     
     % Find type marker
+    % Prioritize Forward Scan (Current row to +8)
     dtype = ''; trow = 0; unit = '-';
-    for r = idx : min(idx + 8, height(T))
+
+    % Priority 1: Forward Scan for MAP or CURVE (Strong Types)
+    scanForward = idx : min(idx + 8, height(T));
+    for r = scanForward
         c1str = strtrim(string(T{r, 1}));
-        
-        % Extract unit
-        rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
-        um = regexp(rtxt, ':"([^"]+)":', 'tokens');
-        if ~isempty(um), unit = um{1}{1}; end
-        
-        if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
-            dtype = 'VALUE'; trow = r; break;
-        elseif strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,')
-            dtype = 'MAP'; trow = r; break;
-        elseif strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
-            dtype = 'CURVE'; trow = r; break;
+        if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,') || strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
+            if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,'), dtype = 'MAP'; else, dtype = 'CURVE'; end
+            trow = r;
+            % Extract unit
+            rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+            um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+            if ~isempty(um), unit = um{1}{1}; end
+            break;
+        end
+    end
+
+    % Priority 2: Forward Scan for VALUE (Weak Type), only if no strong type found
+    if isempty(dtype)
+        for r = scanForward
+            c1str = strtrim(string(T{r, 1}));
+            if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
+                dtype = 'VALUE'; trow = r;
+                rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+                um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+                if ~isempty(um), unit = um{1}{1}; end
+                break;
+            end
+        end
+    end
+
+    % Priority 3: Backward Scan for MAP/CURVE
+    if isempty(dtype)
+        scanBackward = (idx - 1) : -1 : max(1, idx - 5);
+        for r = scanBackward
+            c1str = strtrim(string(T{r, 1}));
+            if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,') || strcmpi(c1str, 'CURVE') || strcmpi(c1str, 'KURVE')
+                if strcmpi(c1str, 'MAP') || strcmpi(c1str, 'MAP,'), dtype = 'MAP'; else, dtype = 'CURVE'; end
+                trow = r;
+                rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+                um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+                if ~isempty(um), unit = um{1}{1}; end
+                break;
+            end
+        end
+    end
+
+    % Priority 4: Backward Scan for VALUE
+    if isempty(dtype)
+        scanBackward = (idx - 1) : -1 : max(1, idx - 5);
+        for r = scanBackward
+            c1str = strtrim(string(T{r, 1}));
+            if strcmpi(c1str, 'VALUE') || startsWith(c1str, 'VALUE', 'IgnoreCase', true)
+                dtype = 'VALUE'; trow = r;
+                rtxt = strjoin(string(table2cell(T(r, 1:min(5, width(T))))), ' ');
+                um = regexp(rtxt, ':"([^"]+)":', 'tokens');
+                if ~isempty(um), unit = um{1}{1}; end
+                break;
+            end
         end
     end
     
     if isempty(dtype), return; end
     
     vi = struct('name', varName, 'type', dtype, 'row', idx, 'trow', trow, 'unit', unit, ...
-        'xAxis', [], 'yAxis', [], 'data', [], 'value', NaN, ...
+        'xAxis', [], 'yAxis', [], 'data', [], 'value', NaN, 'headers', [], ...
         'dRowStart', 0, 'dRowEnd', 0, 'dColEnd', 0, 'isINCA', false, 'isCurve', false);
     
     if strcmp(dtype, 'VALUE')
-        vals = str2double(string(table2cell(T(trow, 3:end))));
+        % Try extracting numeric value from columns 2-10
+        rawVals = string(table2cell(T(trow, 2:min(10, width(T)))));
+        vals = str2double(rawVals);
         vv = vals(~isnan(vals));
-        if ~isempty(vv), vi.value = vv(1); end
-        vi.dRowStart = trow;
+
+        if ~isempty(vv)
+            vi.value = vv(1);
+            vi.dRowStart = trow;
+        else
+            % Check next row (trow + 1)
+            nextRowIdx = min(trow+1, height(T));
+            rawValsNext = string(table2cell(T(nextRowIdx, 1:min(10, width(T)))));
+            valsNext = str2double(rawValsNext);
+            vvNext = valsNext(~isnan(valsNext));
+
+            if ~isempty(vvNext)
+                vi.value = vvNext(1);
+                vi.dRowStart = nextRowIdx;
+            else
+                % Handle string values (e.g. boolean flags or text) on trow
+                nonEmpty = rawVals(strlength(strtrim(rawVals)) > 0 & ~ismissing(rawVals));
+                % Filter out variable name itself if it was picked up
+                nonEmpty(strcmpi(nonEmpty, varName)) = [];
+
+                if ~isempty(nonEmpty)
+                     vi.value = nonEmpty(1); % Store as string
+                     vi.dRowStart = trow;
+                else
+                     % Handle string values on trow+1
+                     nonEmptyNext = rawValsNext(strlength(strtrim(rawValsNext)) > 0 & ~ismissing(rawValsNext));
+                     if ~isempty(nonEmptyNext)
+                         vi.value = nonEmptyNext(1);
+                         vi.dRowStart = nextRowIdx;
+                     else
+                         vi.dRowStart = trow; % Default fallback
+                     end
+                end
+            end
+        end
     else
         % Find data rows
-        rs = 0;
+        rs = 0; headerRow = 0;
         for r = trow + 1 : min(trow + 8, height(T))
+            % Check for data row (mostly numeric)
             vals = str2double(string(table2cell(T(r, 3:end))));
             if sum(~isnan(vals)) > 2, rs = r; break; end
+
+            % Check for header row (contains text in data columns, not system row)
+            % Heuristic: First column is empty or not system keyword, and cols 3+ have content
+            rowTxt = strjoin(string(table2cell(T(r, 1:min(3, width(T))))), " ");
+            if ~contains(rowTxt, ["X_AXIS","Y_AXIS","MAP","CURVE","VALUE"], 'IgnoreCase', true)
+                 rowC = string(table2cell(T(r, 3:end)));
+                 if any(strlength(rowC) > 0 & ~ismissing(rowC))
+                     headerRow = r;
+                 end
+            end
         end
         if rs == 0, return; end
         
@@ -4669,6 +4794,12 @@ function vi = extractInterpVariable(T, varName)
         lv = find(~isnan(fr), 1, 'last');
         mc = max(3, lv);
         
+        if headerRow > 0
+             % Extract headers up to mc
+             rawHeaders = string(table2cell(T(headerRow, 3:mc)));
+             vi.headers = rawHeaders;
+        end
+
         data = str2double(string(table2cell(T(rs:re, 3:mc))));
         vi.dRowStart = rs;
         vi.dRowEnd = re;
@@ -4686,9 +4817,9 @@ function vi = extractInterpVariable(T, varName)
         % Pattern in CSV:
         %   Row N:   ,SIBE_AdiffMidForUKTOW    (varName in Var2)
         %   Row N+1: X_AXIS_PTS,:"-":,-120,-24,0,14,...  (axisType in Var1, values in col 3+)
-        vi.xAxis = findAxisValuesCorrect(T, varName, 'X_AXIS_PTS', re);
+        vi.xAxis = findAxisValuesCorrect(T, varName, 'X_AXIS_PTS', idx);
         if strcmp(dtype, 'MAP')
-            vi.yAxis = findAxisValuesCorrect(T, varName, 'Y_AXIS_PTS', re);
+            vi.yAxis = findAxisValuesCorrect(T, varName, 'Y_AXIS_PTS', idx);
         end
     end
 end
@@ -4696,7 +4827,7 @@ end
 function axisPts = findAxisValuesCorrect(T, varName, axisType, startRow)
 % CORRECTED axis extraction:
 % Look for row where Var1 starts with axisType (X_AXIS_PTS or Y_AXIS_PTS)
-% AND the previous row has varName in Var2
+% AND the previous row (or r-2) has varName in Var2
 % Values are in columns 3+ of the axisType row
     axisPts = [];
     
@@ -4704,15 +4835,26 @@ function axisPts = findAxisValuesCorrect(T, varName, axisType, startRow)
         % Check if current row's Var1 starts with axisType
         v1 = strtrim(string(T{r, 1}));
         if startsWith(v1, axisType, 'IgnoreCase', true)
-            % Check if previous row has our variable name in Var2
-            if r > 1
+            % Check if current row (r), previous row (r-1) OR row before that (r-2) has our variable name in Var2
+            match = false;
+            % Check current row
+            v2curr = strtrim(string(T.Var2(r)));
+            if contains(v2curr, varName, 'IgnoreCase', true), match = true; end
+
+            if ~match && r > 1
                 v2prev = strtrim(string(T.Var2(r-1)));
-                if contains(v2prev, varName, 'IgnoreCase', true)
-                    % Extract values from columns 3 onwards of THIS row
-                    vals = str2double(string(table2cell(T(r, 3:end))));
-                    axisPts = vals(~isnan(vals));
-                    return;
-                end
+                if contains(v2prev, varName, 'IgnoreCase', true), match = true; end
+            end
+            if ~match && r > 2
+                v2prev2 = strtrim(string(T.Var2(r-2)));
+                if contains(v2prev2, varName, 'IgnoreCase', true), match = true; end
+            end
+
+            if match
+                % Extract values from columns 3 onwards of THIS row
+                vals = str2double(string(table2cell(T(r, 3:end))));
+                axisPts = vals(~isnan(vals));
+                return;
             end
         end
     end
@@ -4735,16 +4877,12 @@ end
 
 function onMapEdit(mainFig, t, e, ~)
     pushInterpHist(mainFig);
-    if e.Indices(1) > 1 && e.Indices(2) > 1
-        addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
-    end
+    addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
 end
 
 function onCurveEdit(mainFig, t, e, ~)
     pushInterpHist(mainFig);
-    if e.Indices(1) == 2
-        addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
-    end
+    addStyle(t, uistyle('BackgroundColor', [1 1 0]), 'cell', e.Indices);
 end
 
 function onInterpPaste(mainFig, ~, ~)
@@ -4782,12 +4920,16 @@ function undoInterpEdit(mainFig)
 end
 
 function applyGrayHdr(t, vi)
-    gs = uistyle('BackgroundColor', [0.85 0.85 0.85], 'FontWeight', 'bold');
-    if isfield(vi, 'isINCA') && vi.isINCA
-        addStyle(t, gs, 'row', 1);
-        addStyle(t, gs, 'column', 1);
-    elseif isfield(vi, 'isCurve') && vi.isCurve
-        addStyle(t, gs, 'row', 1);
+    gs = uistyle('BackgroundColor', [0.9 0.9 0.95], 'FontWeight', 'bold');
+
+    if strcmp(vi.type, 'MAP') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+        if ~isempty(vi.yAxis)
+            addStyle(t, gs, 'column', 1);
+        end
+    elseif strcmp(vi.type, 'CURVE') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+        if ~isempty(vi.xAxis)
+            addStyle(t, gs, 'column', 1);
+        end
     end
 end
 
@@ -4858,22 +5000,35 @@ function saveInterpData(mainFig, interpFig)
                     end
                 end
             end
-        elseif strcmp(vi.type, 'MAP') && vi.isINCA
-            nr = size(d, 1) - 1;
-            nc = size(d, 2) - 1;
+        elseif strcmp(vi.type, 'MAP') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+            % Map in TCC style:
+            % If vi.yAxis exists, data starts at Col 2. Else Col 1.
+            dataColStart = 1;
+            if ~isempty(vi.yAxis), dataColStart = 2; end
+
+            nr = size(d, 1);
+            nc = size(d, 2) - dataColStart + 1;
+
             for dr = 1:nr
                 tr = vi.dRowStart + dr - 1;
                 if tr <= height(T)
                     for dc = 1:nc
-                        val = d{dr + 1, dc + 1};
+                        val = d{dr, dc + dataColStart - 1};
                         if isnumeric(val), T{tr, 2 + dc} = {val}; end
                     end
                 end
             end
-        elseif strcmp(vi.type, 'CURVE') && vi.isCurve
+        elseif strcmp(vi.type, 'CURVE') && isfield(vi, 'isTCCStyle') && vi.isTCCStyle
+            % Curve in Vertical style:
+            % If vi.xAxis exists, data is in Col 2. Else Col 1.
+            dataCol = 1;
+            if ~isempty(vi.xAxis), dataCol = 2; end
+
+            % Save to CSV (Horizontal)
+            nc = size(d, 1);
             if vi.dRowStart > 0 && vi.dRowStart <= height(T)
-                for dc = 1:size(d, 2)
-                    val = d{2, dc};
+                for dc = 1:nc
+                    val = d{dc, dataCol};
                     if isnumeric(val), T{vi.dRowStart, 2 + dc} = {val}; end
                 end
             end
